@@ -1,0 +1,4 @@
+simulation_node:
+  ros__parameters:
+    backend: mujoco
+    model_path: ""
