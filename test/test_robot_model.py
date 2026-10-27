@@ -12,6 +12,34 @@ def model():
     return build_scene()
 
 
+def test_default_diffuse_is_brighter(model):
+    np.testing.assert_allclose(model.vis.headlight.diffuse, [0.8, 0.8, 0.8])
+
+
+def test_custom_scene_lighting():
+    model = build_scene(
+        headlight_ambient=[0.2, 0.3, 0.4],
+        headlight_diffuse=[0.9, 0.8, 0.7],
+        headlight_specular=[0., 0.1, 0.2],
+        light_diffuse=[0.3, 0.4, 0.5], light_castshadow=False)
+    np.testing.assert_allclose(model.vis.headlight.ambient, [0.2, 0.3, 0.4])
+    np.testing.assert_allclose(model.vis.headlight.diffuse, [0.9, 0.8, 0.7])
+    np.testing.assert_allclose(model.vis.headlight.specular, [0., 0.1, 0.2])
+    overhead = model.light('overhead')
+    np.testing.assert_allclose(overhead.diffuse, [0.3, 0.4, 0.5])
+    assert not overhead.castshadow[0]
+
+
+@pytest.mark.parametrize('name', [
+    'headlight_ambient', 'headlight_diffuse', 'headlight_specular', 'light_diffuse'])
+@pytest.mark.parametrize('invalid', [
+    [], [0.5, 0.5], [0., np.nan, 0.], [0., np.inf, 0.],
+    [-0.1, 0., 0.], [1.1, 0., 0.]])
+def test_invalid_lighting_is_rejected(name, invalid):
+    with pytest.raises(ValueError, match=name):
+        build_scene(**{name: invalid})
+
+
 @pytest.mark.parametrize('angles', [
     np.zeros(6),
     [0.3, -1.2, 0.8, -0.4, 0.7, -0.9],

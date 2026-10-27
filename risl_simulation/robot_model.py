@@ -8,8 +8,7 @@ from ament_index_python.packages import get_package_share_directory
 import mujoco
 import numpy as np
 import xacro
-from risl_camera_localizer.object_models import DEFAULT_OBJECT_NAMES
-from risl_simulation.recognized_objects import add_objects
+from risl_simulation.recognized_objects import add_objects, DEFAULT_SCENE_OBJECT_NAMES
 
 from risl_ur.custom_libraries.gripper_geometry import (
     GRIPPER_FINGER_OFFSET, GRIPPER_TABLE, gripper_width_to_reach,
@@ -27,7 +26,11 @@ FINGER_LENGTH = 0.070
 
 def build_scene(prefix='', kinematics_params='', world_frame='base',
                 mount_xyz=(0., 0., 0.), mount_rpy=(0., 0., 0.),
-                object_names=DEFAULT_OBJECT_NAMES):
+                object_names=DEFAULT_SCENE_OBJECT_NAMES,
+                headlight_ambient=(0.1, 0.1, 0.1),
+                headlight_diffuse=(0.8, 0.8, 0.8),
+                headlight_specular=(0.5, 0.5, 0.5),
+                light_diffuse=(0.7, 0.7, 0.7), light_castshadow=True):
     """
     Compile ROS URDF to MJCF, retaining fixed tool frames and STL meshes.
 
@@ -39,6 +42,15 @@ def build_scene(prefix='', kinematics_params='', world_frame='base',
     if any(len(v) != 3 or not np.all(np.isfinite(v))
            for v in (mount_xyz, mount_rpy)):
         raise ValueError('Mount xyz and rpy must each contain three finite values')
+    for name, value in (
+            ('headlight_ambient', headlight_ambient),
+            ('headlight_diffuse', headlight_diffuse),
+            ('headlight_specular', headlight_specular),
+            ('light_diffuse', light_diffuse)):
+        if (len(value) != 3 or not np.all(np.isfinite(value))
+                or np.any(np.asarray(value) < 0)
+                or np.any(np.asarray(value) > 1)):
+            raise ValueError(f'{name} must contain three finite RGB values in 0..1')
     share = Path(get_package_share_directory('ur_description'))
     mappings = {'name': 'ur5e', 'ur_type': 'ur5e', 'tf_prefix': prefix}
     if kinematics_params:
@@ -63,6 +75,16 @@ def build_scene(prefix='', kinematics_params='', world_frame='base',
         mujoco.mj_saveLastXML(str(converted), arm)
         scene = ET.parse(converted).getroot()
     scene.find('compiler').set('angle', 'radian')
+    visual = scene.find('visual')
+    if visual is None:
+        visual = ET.SubElement(scene, 'visual')
+    headlight = visual.find('headlight')
+    if headlight is None:
+        headlight = ET.SubElement(visual, 'headlight')
+    for name, value in (('ambient', headlight_ambient),
+                        ('diffuse', headlight_diffuse),
+                        ('specular', headlight_specular)):
+        headlight.set(name, ' '.join(map(str, value)))
     world = scene.find('worldbody')
     # UR base is rotated pi about Z relative to ROS base_link.
     root = ET.Element('body', name='robot_root',
@@ -109,7 +131,9 @@ def build_scene(prefix='', kinematics_params='', world_frame='base',
                       pos=f'{-direction * 0.004} '
                           f'{-GRIPPER_FINGER_OFFSET} {FINGER_LENGTH}',
                       size='0.002', rgba='1 0.2 0 1')
-    ET.SubElement(world, 'light', pos='0 0 3')
+    ET.SubElement(world, 'light', name='overhead', pos='0 0 3',
+                  diffuse=' '.join(map(str, light_diffuse)),
+                  castshadow='true' if light_castshadow else 'false')
     ET.SubElement(world, 'geom', type='plane', size='2 2 0.1',
                   rgba='0.8 0.8 0.8 1')
     add_objects(scene, object_names)

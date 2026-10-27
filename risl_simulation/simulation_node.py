@@ -12,10 +12,9 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64
 from tf2_geometry_msgs import do_transform_pose
 from tf2_ros import Buffer, TransformException, TransformListener
-from risl_camera_localizer.object_models import DEFAULT_OBJECT_NAMES
 
 from risl_simulation.robot_model import build_scene, JointStateMirror
-from risl_simulation.recognized_objects import RecognizedObjectMirror
+from risl_simulation.recognized_objects import RecognizedObjectMirror, DEFAULT_SCENE_OBJECT_NAMES
 
 
 class SimulationNode(Node):
@@ -26,7 +25,7 @@ class SimulationNode(Node):
             'joint_states_topic': '/joint_states',
             'joint_prefix': '',
             'gripper_width_topic': '/gripper_queried_width',
-            'object_names': list(DEFAULT_OBJECT_NAMES),
+            'object_names': list(DEFAULT_SCENE_OBJECT_NAMES),
             'object_pose_topic_prefix': '/vision/object_poses',
             'object_timeout': 2.,
             'world_frame': 'base',
@@ -36,12 +35,34 @@ class SimulationNode(Node):
             'initial_gripper_width_mm': 110.,
             'show_viewer': True,
             'render_rate': 30.,
+            'headlight_ambient': [0.1, 0.1, 0.1],
+            'headlight_diffuse': [0.8, 0.8, 0.8],
+            'headlight_specular': [0.5, 0.5, 0.5],
+            'light_diffuse': [0.7, 0.7, 0.7],
+            'light_castshadow': True,
+            'camera_lookat': [0., 0., 0.35],
+            'camera_distance': 1.8,
+            'camera_azimuth': 90.,
+            'camera_elevation': -45.,
+            'show_right_ui': False,
+            'show_left_ui': False,
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
         params = {name: self.get_parameter(name).value for name in defaults}
         if not np.isfinite(params['render_rate']) or params['render_rate'] <= 0:
             raise ValueError('render_rate must be finite and positive')
+        lookat = params['camera_lookat']
+        if len(lookat) != 3 or not np.all(np.isfinite(lookat)):
+            raise ValueError('camera_lookat must contain three finite values')
+        if (not np.isfinite(params['camera_distance'])
+                or params['camera_distance'] <= 0):
+            raise ValueError('camera_distance must be finite and positive')
+        for name in ('camera_azimuth', 'camera_elevation'):
+            if not np.isfinite(params[name]):
+                raise ValueError(f'{name} must be finite')
+        if not -90 <= params['camera_elevation'] <= 90:
+            raise ValueError('camera_elevation must be within -90..90 degrees')
         self.world_frame = params['joint_prefix'] + params['world_frame']
         self.model = build_scene(
             prefix=params['joint_prefix'],
@@ -49,7 +70,12 @@ class SimulationNode(Node):
             world_frame=params['world_frame'],
             mount_xyz=params['gripper_mount_xyz'],
             mount_rpy=params['gripper_mount_rpy'],
-            object_names=params['object_names'])
+            object_names=params['object_names'],
+            headlight_ambient=params['headlight_ambient'],
+            headlight_diffuse=params['headlight_diffuse'],
+            headlight_specular=params['headlight_specular'],
+            light_diffuse=params['light_diffuse'],
+            light_castshadow=params['light_castshadow'])
         self.data = mujoco.MjData(self.model)
         self.mirror = JointStateMirror(self.model, params['joint_prefix'])
         self.mirror.set_width(self.data, params['initial_gripper_width_mm'])
@@ -65,8 +91,10 @@ class SimulationNode(Node):
 
         if self.viewer:
             with self.viewer.lock():
-                self.viewer.cam.lookat[:] = [0, 0, 0.35]
-                self.viewer.cam.distance = 1.8
+                self.viewer.cam.lookat[:] = params['camera_lookat']
+                self.viewer.cam.distance = params['camera_distance']
+                self.viewer.cam.azimuth = params['camera_azimuth']
+                self.viewer.cam.elevation = params['camera_elevation']
 
         self.joint_subscription = self.create_subscription(
             JointState, params['joint_states_topic'], self.joint_callback,

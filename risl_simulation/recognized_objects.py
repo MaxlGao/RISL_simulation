@@ -6,6 +6,12 @@ import numpy as np
 from risl_camera_localizer.object_models import load_object_meshes, object_kind
 
 
+# Both configured localizer dictionaries (4x4_250 and 5x5_250) use IDs 0..249.
+# Preallocate bodies so tags first observed after startup can appear immediately.
+DEFAULT_SCENE_OBJECT_NAMES = ('wrench', 'allen_key') + tuple(
+    f'jenga_{marker_id}' for marker_id in range(250))
+
+
 def add_objects(scene, names):
     """Add named mocap bodies using shared localizer geometry in meters."""
     if not names or len(names) != len(set(names)):

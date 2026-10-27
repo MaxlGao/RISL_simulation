@@ -77,6 +77,28 @@ Copy `config/simulation.yaml`, edit it, and launch with
   timestamp and are skipped if TF is unavailable.
   An empty frame ID is assumed to mean the configured world frame.
 
+### Scene appearance
+
+The same YAML exposes these startup options; restart the node after editing:
+
+| Parameter | Default | Effect |
+| --- | --- | --- |
+| `headlight_diffuse` | `[0.8, 0.8, 0.8]` | Camera-following diffuse light, brighter than MuJoCo's default of `0.4` per channel. |
+| `headlight_ambient` | `[0.1, 0.1, 0.1]` | Fill light for surfaces facing away from the light. |
+| `headlight_specular` | `[0.5, 0.5, 0.5]` | Strength/color of shiny highlights. |
+| `light_diffuse` | `[0.7, 0.7, 0.7]` | Diffuse light from the fixed overhead lamp at `[0, 0, 3]` meters. |
+| `light_castshadow` | `true` | Enable shadows from the overhead lamp. |
+| `camera_lookat` | `[0.0, 0.0, 0.35]` | Initial camera target in world coordinates, meters. |
+| `camera_distance` | `1.8` | Initial distance to the target, meters; must be positive. |
+| `camera_azimuth` | `90.0` | Initial horizontal orbit angle, degrees. |
+| `camera_elevation` | `-45.0` | Initial vertical orbit angle, degrees within `-90..90`. |
+
+Lighting arrays are RGB triples with finite values in `0..1`; equal channels
+produce white light. Raise ambient to lift dark surfaces, or lower specular to
+reduce glare. The headlight and overhead light add together. See the
+[MuJoCo lighting reference](https://mujoco.readthedocs.io/en/stable/XMLreference.html#visual-headlight).
+Camera options only affect the viewer's initial view; mouse controls remain available.
+
 For accurate RG2 geometry, export your SolidWorks parts as separate binary STL
 files for the fixed assembly and each moving finger, in meters, retaining their
 shared assembly coordinates. Include the mounting origin, finger pivot/axis
@@ -118,7 +140,7 @@ By default, the simulation subscribes to these `geometry_msgs/PoseStamped` topic
 | --- | --- | --- |
 | Wrench | `/vision/object_poses/wrench` | Body-aligned `Wrench.STL` |
 | Allen key | `/vision/object_poses/allen_key` | Body-aligned `Allen Key.STL` |
-| Jenga marker 6 | `/vision/object_poses/jenga_6` | 72 × 24 × 14 mm box |
+| Jenga markers 0–249 | `/vision/object_poses/jenga_<id>` | 72 × 24 × 14 mm box per ID |
 
 `risl_camera_localizer.object_models` now provides the same meshes and body-frame
 alignment to both contour processing and MuJoCo, including millimeter-to-meter
@@ -133,11 +155,13 @@ pose stream: the localizer may continue publishing its own predicted/held poses
 during an occlusion, which will continue to display. No camera is opened by the
 simulation and no vision recognition is duplicated.
 
-Configure `object_names` to choose objects, including multiple `jenga_<id>`
-instances, and restart the simulation. The localizer currently detects only
-marker 6; additional IDs also require changing its detector's ID filter.
-The bridge supports publishing additional instances on the same `/vision` topic
-prefix. Change `object_pose_topic_prefix` if replaying or remapping other topics.
+The default scene preallocates a body and subscribes for every Jenga ID in the
+localizer's configured 250-marker dictionaries. Tags can first appear after
+simulation startup; unseen bodies stay hidden until a pose arrives. This scene
+list is independent of allocation, which remains restricted to Jenga 6.
+Configure `object_names` to restrict the scene to an explicit subset, including
+multiple `jenga_<id>` instances, and restart the simulation.
+Change `object_pose_topic_prefix` if replaying or remapping other topics.
 The old single `target_object_name` parameter and `/object_poses` topic default
 have been replaced with this object list and `/vision/object_poses` prefix.
 Recognized objects are pose-driven visual bodies; no contact forces are simulated.

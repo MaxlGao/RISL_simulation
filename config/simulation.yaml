@@ -3,7 +3,9 @@ simulation_node:
     joint_states_topic: /joint_states
     joint_prefix: ""
     gripper_width_topic: /gripper_queried_width
-    object_names: [wrench, allen_key, jenga_6]
+    # Default object_names includes wrench, allen_key, and jenga_0..jenga_249.
+    # Uncomment to restrict the scene to an explicit subset:
+    # object_names: [wrench, allen_key, jenga_6]
     object_pose_topic_prefix: /vision/object_poses
     # Hide objects after this many seconds without a valid pose; 0 holds forever.
     object_timeout: 2.0
@@ -18,3 +20,17 @@ simulation_node:
     initial_gripper_width_mm: 110.0
     show_viewer: true
     render_rate: 30.0
+    # Lighting RGB values in 0..1. The headlight follows the camera.
+    headlight_ambient: [0.1, 0.1, 0.1]
+    # Brighter than MuJoCo's default [0.4, 0.4, 0.4].
+    headlight_diffuse: [0.8, 0.8, 0.8]
+    headlight_specular: [0.5, 0.5, 0.5]
+    # Fixed overhead light at [0, 0, 3] meters.
+    light_diffuse: [0.7, 0.7, 0.7]
+    light_castshadow: true
+    # Initial viewer camera: target in world meters, distance in meters,
+    # azimuth/elevation in degrees. Mouse controls still work after launch.
+    camera_lookat: [0.0, 0.0, 0.35]
+    camera_distance: 1.8
+    camera_azimuth: 90.0
+    camera_elevation: -45.0
