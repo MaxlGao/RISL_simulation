@@ -1,4 +1,17 @@
 simulation_node:
   ros__parameters:
-    backend: mujoco
-    model_path: ""
+    joint_states_topic: /joint_states
+    joint_prefix: ""
+    gripper_width_topic: /gripper_queried_width
+    target_object_name: jenga_6
+    # UR controller base frame; base_link differs by a rotation of pi about Z.
+    world_frame: base
+    # Optional calibrated UR kinematics YAML, matching the driver's file.
+    kinematics_params: ""
+    # Adjustment relative to GRIPPER_TABLE's calibrated zero-TCP setup.
+    # Meters and roll/pitch/yaw radians; leave zero for the measured assembly.
+    gripper_mount_xyz: [0.0, 0.0, 0.0]
+    gripper_mount_rpy: [0.0, 0.0, 0.0]
+    initial_gripper_width_mm: 110.0
+    show_viewer: true
+    render_rate: 30.0
