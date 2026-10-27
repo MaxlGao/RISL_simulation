@@ -8,6 +8,8 @@ from ament_index_python.packages import get_package_share_directory
 import mujoco
 import numpy as np
 import xacro
+from risl_camera_localizer.object_models import DEFAULT_OBJECT_NAMES
+from risl_simulation.recognized_objects import add_objects
 
 from risl_ur.custom_libraries.gripper_geometry import (
     GRIPPER_FINGER_OFFSET, GRIPPER_TABLE, gripper_width_to_reach,
@@ -24,7 +26,8 @@ FINGER_LENGTH = 0.070
 
 
 def build_scene(prefix='', kinematics_params='', world_frame='base',
-                mount_xyz=(0., 0., 0.), mount_rpy=(0., 0., 0.)):
+                mount_xyz=(0., 0., 0.), mount_rpy=(0., 0., 0.),
+                object_names=DEFAULT_OBJECT_NAMES):
     """
     Compile ROS URDF to MJCF, retaining fixed tool frames and STL meshes.
 
@@ -109,10 +112,7 @@ def build_scene(prefix='', kinematics_params='', world_frame='base',
     ET.SubElement(world, 'light', pos='0 0 3')
     ET.SubElement(world, 'geom', type='plane', size='2 2 0.1',
                   rgba='0.8 0.8 0.8 1')
-    block = ET.SubElement(world, 'body', name='tracked_block',
-                          mocap='true', pos='0 0 0.1')
-    ET.SubElement(block, 'geom', type='box', size='0.036 0.012 0.007',
-                  rgba='0.7 0.4 0.2 1', contype='0', conaffinity='0')
+    add_objects(scene, object_names)
     return mujoco.MjModel.from_xml_string(ET.tostring(scene, encoding='unicode'))
 
 

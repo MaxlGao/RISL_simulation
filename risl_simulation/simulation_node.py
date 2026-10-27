@@ -2,6 +2,7 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 from contextlib import nullcontext
+from functools import partial
 
 import rclpy
 from rclpy.node import Node
@@ -11,8 +12,10 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64
 from tf2_geometry_msgs import do_transform_pose
 from tf2_ros import Buffer, TransformException, TransformListener
+from risl_camera_localizer.object_models import DEFAULT_OBJECT_NAMES
 
 from risl_simulation.robot_model import build_scene, JointStateMirror
+from risl_simulation.recognized_objects import RecognizedObjectMirror
 
 
 class SimulationNode(Node):
@@ -23,7 +26,9 @@ class SimulationNode(Node):
             'joint_states_topic': '/joint_states',
             'joint_prefix': '',
             'gripper_width_topic': '/gripper_queried_width',
-            'target_object_name': 'jenga_6',
+            'object_names': list(DEFAULT_OBJECT_NAMES),
+            'object_pose_topic_prefix': '/vision/object_poses',
+            'object_timeout': 2.,
             'world_frame': 'base',
             'kinematics_params': '',
             'gripper_mount_xyz': [0., 0., 0.],
@@ -43,16 +48,15 @@ class SimulationNode(Node):
             kinematics_params=params['kinematics_params'],
             world_frame=params['world_frame'],
             mount_xyz=params['gripper_mount_xyz'],
-            mount_rpy=params['gripper_mount_rpy'])
+            mount_rpy=params['gripper_mount_rpy'],
+            object_names=params['object_names'])
         self.data = mujoco.MjData(self.model)
         self.mirror = JointStateMirror(self.model, params['joint_prefix'])
         self.mirror.set_width(self.data, params['initial_gripper_width_mm'])
-        self.target_object_name = params['target_object_name']
+        self.objects = RecognizedObjectMirror(
+            self.model, params['object_names'], params['object_timeout'])
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
-
-        body_id = self.model.body("tracked_block").id
-        self.mocap_id = self.model.body_mocapid[body_id]
 
         mujoco.mj_forward(self.model, self.data)
 
@@ -71,12 +75,12 @@ class SimulationNode(Node):
             Float64, params['gripper_width_topic'], self.width_callback,
             qos_profile_sensor_data)
 
-        self.subscription = self.create_subscription(
-            PoseStamped,
-            f"/object_poses/{self.target_object_name}",
-            self.pose_callback,
-            qos_profile_sensor_data,
-        )
+        topic_prefix = params['object_pose_topic_prefix'].rstrip('/')
+        self.object_subscriptions = {
+            name: self.create_subscription(
+                PoseStamped, f'{topic_prefix}/{name}',
+                partial(self.pose_callback, object_name=name), qos_profile_sensor_data)
+            for name in params['object_names']}
 
         self.render_timer = self.create_timer(
             1.0 / params['render_rate'], self.refresh_viewer
@@ -109,7 +113,7 @@ class SimulationNode(Node):
             self.get_logger().warning(
                 'Waiting for joint states: ' + ', '.join(sorted(missing)))
 
-    def pose_callback(self, msg):
+    def pose_callback(self, msg, object_name):
         pose = msg.pose
         if msg.header.frame_id and msg.header.frame_id != self.world_frame:
             try:
@@ -125,22 +129,14 @@ class SimulationNode(Node):
         p = pose.position
         q = pose.orientation
 
-        position = np.array([p.x, p.y, p.z])
-        # MuJoCo quaternion order is w, x, y, z.
-        quaternion = np.array([q.w, q.x, q.y, q.z])
-
-        norm = np.linalg.norm(quaternion)
-        if (
-            not np.all(np.isfinite(position))
-            or not np.all(np.isfinite(quaternion))
-            or norm < 1e-8
-        ):
-            self.get_logger().warning("Ignoring invalid pose")
-            return
-
-        with self.scene_lock():
-            self.data.mocap_pos[self.mocap_id] = position
-            self.data.mocap_quat[self.mocap_id] = quaternion / norm
+        try:
+            with self.scene_lock():
+                self.objects.update(
+                    self.data, object_name, [p.x, p.y, p.z], [q.w, q.x, q.y, q.z],
+                    self.get_clock().now().nanoseconds * 1e-9)
+        except ValueError as error:
+            self.get_logger().warning(
+                f'{object_name}: {error}', throttle_duration_sec=5.0)
 
     def refresh_viewer(self):
         if self.viewer and not self.viewer.is_running():
@@ -148,6 +144,7 @@ class SimulationNode(Node):
             return
 
         with self.scene_lock():
+            self.objects.expire(self.data, self.get_clock().now().nanoseconds * 1e-9)
             mujoco.mj_forward(self.model, self.data)
 
         if self.viewer:

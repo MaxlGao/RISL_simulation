@@ -3,7 +3,10 @@ simulation_node:
     joint_states_topic: /joint_states
     joint_prefix: ""
     gripper_width_topic: /gripper_queried_width
-    target_object_name: jenga_6
+    object_names: [wrench, allen_key, jenga_6]
+    object_pose_topic_prefix: /vision/object_poses
+    # Hide objects after this many seconds without a valid pose; 0 holds forever.
+    object_timeout: 2.0
     # UR controller base frame; base_link differs by a rotation of pi about Z.
     world_frame: base
     # Optional calibrated UR kinematics YAML, matching the driver's file.

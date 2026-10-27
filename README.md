@@ -16,7 +16,7 @@ Python environment to build and launch so the executable can import MuJoCo:
 cd ~/risl_assembly_ws
 source /opt/ros/humble/setup.bash
 source .venv/bin/activate
-python -m colcon build --packages-select risl_ur risl_simulation risl_onrobot_ros --symlink-install
+python -m colcon build --packages-select risl_ur risl_camera_localizer risl_simulation risl_onrobot_ros --symlink-install
 source install/setup.bash
 ros2 launch risl_simulation simulation.launch.py
 ```
@@ -73,9 +73,8 @@ Copy `config/simulation.yaml`, edit it, and launch with
   counting an adapter twice. These are startup parameters.
 - The world defaults to UR's `base`, matching this workspace's camera localizer.
   `world_frame: base_link` is also supported. A configured joint prefix is applied
-  to the frame name. Object poses on `/object_poses/jenga_6` retain the existing
-  tracked block display; change `target_object_name` as needed. Poses in other
-  frames use TF at their message timestamp and are skipped if TF is unavailable.
+  to the frame name. Object poses in other frames use TF at their message
+  timestamp and are skipped if TF is unavailable.
   An empty frame ID is assumed to mean the configured world frame.
 
 For accurate RG2 geometry, export your SolidWorks parts as separate binary STL
@@ -104,3 +103,41 @@ the controller calibration. Orange sites mark the inner fingertip centers; red
 sites mark their leading edges. These positions follow the arm's full 3D pose.
 The controller's `vertical_offset` represents its virtual table level and is
 not added to the physical gripper geometry.
+
+## Recognized objects
+
+Run the camera localizer alongside the simulation (select your camera ID):
+
+```bash
+ros2 run risl_camera_localizer localize --camera-id 4
+```
+
+By default, the simulation subscribes to these `geometry_msgs/PoseStamped` topics:
+
+| Object | Topic | Geometry |
+| --- | --- | --- |
+| Wrench | `/vision/object_poses/wrench` | Body-aligned `Wrench.STL` |
+| Allen key | `/vision/object_poses/allen_key` | Body-aligned `Allen Key.STL` |
+| Jenga marker 6 | `/vision/object_poses/jenga_6` | 72 × 24 × 14 mm box |
+
+`risl_camera_localizer.object_models` now provides the same meshes and body-frame
+alignment to both contour processing and MuJoCo, including millimeter-to-meter
+conversion in the display. The Jenga origin lies on the top surface; its solid
+extends 14 mm along negative local Z. Tool meshes retain their original body
+origins rather than being centered on their bounding boxes.
+
+Objects stay hidden until their first valid pose, and disappear after
+`object_timeout` seconds without a valid update (default 2.0; zero holds the last
+pose indefinitely). They reappear on fresh feedback. This timeout measures the
+pose stream: the localizer may continue publishing its own predicted/held poses
+during an occlusion, which will continue to display. No camera is opened by the
+simulation and no vision recognition is duplicated.
+
+Configure `object_names` to choose objects, including multiple `jenga_<id>`
+instances, and restart the simulation. The localizer currently detects only
+marker 6; additional IDs also require changing its detector's ID filter.
+The bridge supports publishing additional instances on the same `/vision` topic
+prefix. Change `object_pose_topic_prefix` if replaying or remapping other topics.
+The old single `target_object_name` parameter and `/object_poses` topic default
+have been replaced with this object list and `/vision/object_poses` prefix.
+Recognized objects are pose-driven visual bodies; no contact forces are simulated.
