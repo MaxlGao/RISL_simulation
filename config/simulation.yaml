@@ -28,6 +28,11 @@ simulation_node:
     # Fixed overhead light at [0, 0, 3] meters.
     light_diffuse: [0.7, 0.7, 0.7]
     light_castshadow: true
+    # Wrist camera view along local +Z; FOV matches merged_localization.
+    # Pyramid display depth in meters (not a sensor range limit), angles in degrees.
+    camera_view_depth: 0.35
+    camera_hfov: 69.4
+    camera_vfov: 42.5
     # Initial viewer camera: target in world meters, distance in meters,
     # azimuth/elevation in degrees. Mouse controls still work after launch.
     camera_lookat: [0.0, 0.0, 0.35]

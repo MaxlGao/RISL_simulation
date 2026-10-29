@@ -79,10 +79,21 @@ Copy `config/simulation.yaml`, edit it, and launch with
 
 ### Scene appearance
 
+The wrist camera has a schematic housing and lens attached to `tool0`, with the
+same EE-frame offset as `localizer_bridge`: `[-0.012, -0.038, -0.010]` meters and
+identity rotation. This assumes the controller's zero TCP offset, as above.
+The cyan wireframe pyramid starts at the lens and looks along camera **+Z**,
+using `merged_localization`'s 69.4° horizontal and 42.5° vertical field of view.
+It follows the arm without requiring the localizer to run. Housing dimensions
+are illustrative; the pyramid is a visual guide and does not model occlusion.
+
 The same YAML exposes these startup options; restart the node after editing:
 
 | Parameter | Default | Effect |
 | --- | --- | --- |
+| `camera_view_depth` | `0.35` | Wrist camera pyramid depth in meters; positive display length, not a sensor range limit. |
+| `camera_hfov` | `69.4` | Wrist camera horizontal field of view in degrees, strictly between 0 and 180. |
+| `camera_vfov` | `42.5` | Wrist camera vertical field of view in degrees, strictly between 0 and 180. |
 | `headlight_diffuse` | `[0.8, 0.8, 0.8]` | Camera-following diffuse light, brighter than MuJoCo's default of `0.4` per channel. |
 | `headlight_ambient` | `[0.1, 0.1, 0.1]` | Fill light for surfaces facing away from the light. |
 | `headlight_specular` | `[0.5, 0.5, 0.5]` | Strength/color of shiny highlights. |

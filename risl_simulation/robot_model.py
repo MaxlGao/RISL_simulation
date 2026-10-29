@@ -9,6 +9,7 @@ import mujoco
 import numpy as np
 import xacro
 from risl_simulation.recognized_objects import add_objects, DEFAULT_SCENE_OBJECT_NAMES
+from risl_simulation.camera_model import add_camera
 
 from risl_ur.custom_libraries.gripper_geometry import (
     GRIPPER_FINGER_OFFSET, GRIPPER_TABLE, gripper_width_to_reach,
@@ -30,7 +31,8 @@ def build_scene(prefix='', kinematics_params='', world_frame='base',
                 headlight_ambient=(0.1, 0.1, 0.1),
                 headlight_diffuse=(0.8, 0.8, 0.8),
                 headlight_specular=(0.5, 0.5, 0.5),
-                light_diffuse=(0.7, 0.7, 0.7), light_castshadow=True):
+                light_diffuse=(0.7, 0.7, 0.7), light_castshadow=True,
+                camera_view_depth=0.35, camera_hfov=69.4, camera_vfov=42.5):
     """
     Compile ROS URDF to MJCF, retaining fixed tool frames and STL meshes.
 
@@ -101,6 +103,7 @@ def build_scene(prefix='', kinematics_params='', world_frame='base',
     tool = root.find(f".//body[@name='{prefix}tool0']")
     if tool is None:
         raise ValueError('UR description did not preserve tool0')
+    add_camera(tool, camera_view_depth, camera_hfov, camera_vfov)
     gripper = ET.SubElement(
         tool, 'body', name='rg2_mount',
         pos=' '.join(map(str, mount_xyz)), euler=' '.join(map(str, mount_rpy)))

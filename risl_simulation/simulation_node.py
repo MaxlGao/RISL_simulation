@@ -40,6 +40,9 @@ class SimulationNode(Node):
             'headlight_specular': [0.5, 0.5, 0.5],
             'light_diffuse': [0.7, 0.7, 0.7],
             'light_castshadow': True,
+            'camera_view_depth': 0.35,
+            'camera_hfov': 69.4,
+            'camera_vfov': 42.5,
             'camera_lookat': [0., 0., 0.35],
             'camera_distance': 1.8,
             'camera_azimuth': 90.,
@@ -75,7 +78,10 @@ class SimulationNode(Node):
             headlight_diffuse=params['headlight_diffuse'],
             headlight_specular=params['headlight_specular'],
             light_diffuse=params['light_diffuse'],
-            light_castshadow=params['light_castshadow'])
+            light_castshadow=params['light_castshadow'],
+            camera_view_depth=params['camera_view_depth'],
+            camera_hfov=params['camera_hfov'],
+            camera_vfov=params['camera_vfov'])
         self.data = mujoco.MjData(self.model)
         self.mirror = JointStateMirror(self.model, params['joint_prefix'])
         self.mirror.set_width(self.data, params['initial_gripper_width_mm'])
